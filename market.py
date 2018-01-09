@@ -5,11 +5,6 @@ import math
 _api_key_addresss = "_API_KEY"
 _api_secret_address = "_API_SECRET"
 
-EXCHANGE_BINANCE = 'BINANCE'
-
-SIDE_HODL = "hodl"
-SIDE_SELL = "sell"
-SIDE_BUY = "buy"
 
 SELL_FRACTION = 1.0
 BUY_FRACTION = 0.45

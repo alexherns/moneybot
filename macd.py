@@ -1,5 +1,5 @@
 import pandas as pd
-import market as mkt
+import common
 
 
 def predict_behavior(exchange, market, timeframe='30m', ma1=12, ma2=26):
@@ -18,7 +18,7 @@ def _predict_mkt_data(ohlcv_data, ma1, ma2):
     rolling_ma1 = list(opening_prices.rolling(window=ma1, center=False).mean())
     rolling_ma2 = list(opening_prices.rolling(window=ma2, center=False).mean())
     if rolling_ma1[-1] > rolling_ma2[-1] and rolling_ma1[-2] < rolling_ma2[-2]:
-        return mkt.SIDE_BUY
+        return common.SIDE_BUY
     elif rolling_ma1[-1] < rolling_ma2[-1] and rolling_ma1[-2] > rolling_ma2[-2]:
-        return mkt.SIDE_SELL
-    return mkt.SIDE_HODL
+        return common.SIDE_SELL
+    return common.SIDE_HODL
