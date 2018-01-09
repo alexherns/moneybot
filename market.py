@@ -1,13 +1,16 @@
 import os
-import ccxt
 import math
+import ccxt
+import common
 
 _api_key_addresss = "_API_KEY"
 _api_secret_address = "_API_SECRET"
 
 
-SELL_FRACTION = 1.0
-BUY_FRACTION = 0.45
+MARKET_TRADE_SELL_FRACTION = 1.0
+MARKET_TRADE_BUY_FRACTION = 0.45
+
+LIMIT_BOUND_TRADE_FRACTION = 0.4
 
 
 class Market:
@@ -54,9 +57,9 @@ class Limit_Trade:
         self.price = price
 
     def place_trade(self, exchange):
-        if self.side == SIDE_HODL:
+        if self.side == common.SIDE_HODL:
             return None
-        if self.side == SIDE_BUY:
+        if self.side == common.SIDE_BUY:
             return exchange.create_limit_buy_order(self.market, self.trading_amount, self.price)
         else:
             return exchange.create_limit_sell_order(self.market, self.trading_amount, self.price)
@@ -64,19 +67,28 @@ class Limit_Trade:
 
 class Market_Trade:
     def __init__(self, market, side, trading_amount):
-        if side not in (SIDE_HODL, SIDE_BUY, SIDE_SELL):
+        if side not in (common.SIDE_HODL, common.SIDE_BUY, common.SIDE_SELL):
             raise Exception('Unknown side for execution')
         self.market = market
         self.side = side
         self.trading_amount = trading_amount
 
     def place_trade(self, exchange):
-        if self.side == SIDE_HODL:
+        if self.side == common.SIDE_HODL:
             return None
-        if self.side == SIDE_BUY:
+        if self.side == common.SIDE_BUY:
             return exchange.create_market_buy_order(self.market, self.trading_amount)
         else:
             return exchange.create_market_sell_order(self.market, self.trading_amount)
+
+
+class Limit_Order:
+    def __init__(self, order_id, market):
+        self.order_id = order_id
+        self.market = market
+
+    def cancel(self, exchange):
+        return exchange.cancel_order(self.order_id, self.market)
 
 
 def fetch_limits(exchange, market):
@@ -89,7 +101,7 @@ def fetch_limits(exchange, market):
     )
 
 
-def get_exchange(exchange=EXCHANGE_BINANCE):
+def get_exchange(exchange):
     api_key = os.environ[exchange.upper() + _api_key_addresss]
     api_secret = os.environ[exchange.upper() + _api_secret_address]
     exc = getattr(ccxt, exchange.lower())({
@@ -107,30 +119,80 @@ def predict_market_trade(market_trade_algorithm, logger, exchange, market, **kwa
     limits = fetch_limits(exchange, market)
     balance = exchange.fetch_free_balance()
     ticker = exchange.fetchTicker(market)
-    amount = get_trading_amount(logger, limits, market, side, balance, ticker)
+    amount = get_market_trading_amount(
+        logger, limits, market, side, balance, ticker)
     logger.info('amount predicted %s', str(amount))
     return Market_Trade(market, side, amount)
 
 
-def get_trading_amount(logger, limits, market, side, balance, ticker):
-    if side == SIDE_HODL:
+def get_market_trading_amount(logger, limits, market, side, balance, ticker):
+    if side == common.SIDE_HODL:
         return None
-    elif side not in (SIDE_BUY, SIDE_SELL):
+    elif side not in (common.SIDE_BUY, common.SIDE_SELL):
         raise Exception('Unknown side for execution')
-    if side == SIDE_BUY:
+    if side == common.SIDE_BUY:
         purchasing_currency = market.split('/')[1]
-        purchasing_funds = balance[purchasing_currency] * BUY_FRACTION
+        purchasing_funds = balance[purchasing_currency] * \
+            MARKET_TRADE_BUY_FRACTION
         trade_amount = purchasing_funds * ticker['ask']
         logger.info('buying %s with %s at %s with %s gives %s total', market.split(
             '/')[0], purchasing_currency, ticker['ask'], purchasing_funds, trade_amount)
-    elif side == SIDE_SELL:
+    elif side == common.SIDE_SELL:
         sell_currency = market.split('/')[0]
-        trade_amount = balance[sell_currency] * SELL_FRACTION
+        trade_amount = balance[sell_currency] * MARKET_TRADE_SELL_FRACTION
         logger.info('selling %s for %s gives %s total',
                     sell_currency, market.split('/')[0], trade_amount)
-    trade_amount = math.floor(trade_amount / limits.price_filter.tick_size) * \
-        limits.price_filter.tick_size
+    trade_amount = get_rounded_trading_amount(
+        trade_amount, limits.price_filter.tick_size, limits.lot_size.min_qty)
     logger.info('funds available results in %s sale', trade_amount)
     if trade_amount < limits.lot_size.min_qty:
         return None
     return trade_amount
+
+
+def predict_limit_bounds_trade(limit_bounds_trade_algorithm, logger, exchange, market, **kwargs):
+    logger.info('evaluating market %s for limit bounds trade', market)
+    upper_bound, lower_bound = limit_bounds_trade_algorithm(
+        exchange, market, **kwargs)
+    logger.info('upper bound: %s, lower bound: %s', upper_bound, lower_bound)
+    ticker = exchange.fetchTicker(market)
+    sell_price = max(upper_bound, ticker['bid'])
+    buy_price = min(lower_bound, ticker['ask'])
+    logger.info('sell price: %s, buy price: %s', sell_price, buy_price)
+    limits = fetch_limits(exchange, market)
+    balance = exchange.fetch_free_balance()
+    sell_amount, buy_amount = get_limit_bounds_trading_amount(
+        limits, market, upper_bound, lower_bound, balance, ticker)
+    logger.info('upper amount: %s, lower amount: %s', sell_amount, buy_amount)
+    return (
+        Limit_Trade(market, common.SIDE_SELL, sell_amount,
+                    sell_price) if sell_amount else None,
+        Limit_Trade(market, common.SIDE_BUY, buy_amount,
+                    buy_price) if buy_amount else None
+    )
+
+
+def get_rounded_trading_amount(unrounded_amount, step_size, min_qty):
+    rounded_amount = math.floor(unrounded_amount / step_size) * step_size
+    if rounded_amount < min_qty:
+        return None
+    return rounded_amount
+
+
+def get_limit_bounds_trading_amount(limits, market, upper_bound, lower_bound, balance, ticker):
+    sell_currency, buy_currency = market.split('/')
+    sell_funds = balance[sell_currency] * LIMIT_BOUND_TRADE_FRACTION
+    buy_funds = balance[buy_currency] * LIMIT_BOUND_TRADE_FRACTION
+    unrounded_sell_amount = sell_funds
+    unrounded_buy_amount = buy_funds * ticker['ask']
+    sell_amount = get_rounded_trading_amount(
+        unrounded_sell_amount, limits.lot_size.step_size, limits.lot_size.min_qty)
+    buy_amount = get_rounded_trading_amount(
+        unrounded_buy_amount, limits.lot_size.step_size, limits.lot_size.min_qty)
+    return sell_amount, buy_amount
+
+
+# TODO: filter out non-limit orders! important so we can have a stop-limit below the limit orders
+def get_open_limit_orders_for_market(logger, exchange, market):
+    open_orders = exchange.fetch_open_orders(symbol=market)
+    return [Limit_Order(open_order['id'], open_order['symbol']) for open_order in open_orders]

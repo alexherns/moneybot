@@ -42,9 +42,28 @@ def macd_trades_handler(exchange, market, event_params):
 
 
 def bollinger_trades_handler(exchange, market, event_params):
-    market_order = mkt.predict_market_trade(
+    open_orders = mkt.get_open_limit_orders_for_market(
+        logger, exchange, market)
+    for order in open_orders:
+        logger.info('cancel: %s', order.order_id)
+        # order.cancel()
+    if not open_orders:
+        logger.info('no open orders to cancel')
+    upper_limit_order, lower_limit_order = mkt.predict_limit_bounds_trade(
         bollinger.predict_behavior, logger, exchange, market, **event_params)
-    return market_order.place_trade(exchange)
+    if upper_limit_order:
+        logger.info('predicted order: %s %s %s %s', upper_limit_order.market, upper_limit_order.side,
+                    upper_limit_order.price, upper_limit_order.trading_amount)
+        # upper_limit_order.place_trade(exchange)
+    else:
+        logger.info("no sell order possible")
+    if lower_limit_order:
+        logger.info('predicted order: %s %s %s %s', lower_limit_order.market, lower_limit_order.side,
+                    lower_limit_order.price, lower_limit_order.trading_amount)
+        # lower_limit_order.place_trade(exchange)
+    else:
+        logger.info("no buy order possible")
+    return
 
 
 if __name__ == '__main__':

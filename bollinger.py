@@ -1,6 +1,7 @@
 import pandas as pd
 import common
 
+
 def predict_behavior(exchange, market, timeframe='30m', window_size=20, band_factor=2.0):
     ohlcv_data = exchange.fetch_ohlcv(
         market, limit=window_size, timeframe=timeframe)
@@ -14,10 +15,6 @@ def _predict_mkt_data(ohlcv_data, ticker_data, band_factor):
 
     sma = closing_prices.mean()
     stdev = closing_prices.std()
-    upper_band = sma + stdev*band_factor
-    lower_band = sma - stdev*band_factor
-    if ticker_data['bid'] > upper_band:
-        return common.SIDE_SELL
-    elif ticker_data['ask'] < lower_band:
-        return common.SIDE_BUY
-    return common.SIDE_HODL
+    upper_band = sma + stdev * band_factor
+    lower_band = sma - stdev * band_factor
+    return upper_band, lower_band
