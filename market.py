@@ -1,5 +1,6 @@
 import os
 import ccxt
+import math
 
 _api_key_addresss = "_API_KEY"
 _api_secret_address = "_API_SECRET"
@@ -9,6 +10,9 @@ EXCHANGE_BINANCE = 'BINANCE'
 SIDE_HODL = "hodl"
 SIDE_SELL = "sell"
 SIDE_BUY = "buy"
+
+SELL_FRACTION = 1.0
+BUY_FRACTION = 0.45
 
 
 class Market:
@@ -47,6 +51,39 @@ class Market_Limit:
         self.min_notional = min_notional
 
 
+class Limit_Trade:
+    def __init__(self, market, side, trading_amount, price):
+        self.market = market
+        self.side = side
+        self.trading_amount = trading_amount
+        self.price = price
+
+    def place_trade(self, exchange):
+        if self.side == SIDE_HODL:
+            return None
+        if self.side == SIDE_BUY:
+            return exchange.create_limit_buy_order(self.market, self.trading_amount, self.price)
+        else:
+            return exchange.create_limit_sell_order(self.market, self.trading_amount, self.price)
+
+
+class Market_Trade:
+    def __init__(self, market, side, trading_amount):
+        if side not in (SIDE_HODL, SIDE_BUY, SIDE_SELL):
+            raise Exception('Unknown side for execution')
+        self.market = market
+        self.side = side
+        self.trading_amount = trading_amount
+
+    def place_trade(self, exchange):
+        if self.side == SIDE_HODL:
+            return None
+        if self.side == SIDE_BUY:
+            return exchange.create_market_buy_order(self.market, self.trading_amount)
+        else:
+            return exchange.create_market_sell_order(self.market, self.trading_amount)
+
+
 def fetch_limits(exchange, market):
     mkt_limits = exchange.market(market)['limits']
     return Market_Limit(
@@ -68,23 +105,37 @@ def get_exchange(exchange=EXCHANGE_BINANCE):
     return exc
 
 
-def execute_market_trade(exchange, market, side, trading_amount):
+def predict_market_trade(market_trade_algorithm, logger, exchange, market, **kwargs):
+    logger.info('evaluating market %s for behavior', market)
+    side = market_trade_algorithm(exchange, market, **kwargs)
+    logger.info('behavior predicted %s', side)
+    limits = fetch_limits(exchange, market)
+    balance = exchange.fetch_free_balance()
+    ticker = exchange.fetchTicker(market)
+    amount = get_trading_amount(logger, limits, market, side, balance, ticker)
+    logger.info('amount predicted %s', str(amount))
+    return Market_Trade(market, side, amount)
+
+
+def get_trading_amount(logger, limits, market, side, balance, ticker):
     if side == SIDE_HODL:
         return None
     elif side not in (SIDE_BUY, SIDE_SELL):
         raise Exception('Unknown side for execution')
     if side == SIDE_BUY:
-        return exchange.create_market_buy_order(market, trading_amount)
-    else:
-        return exchange.create_market_sell_order(market, trading_amount)
-
-
-def execute_limit_trade(exchange, market, side, trading_amount, price):
-    if side == SIDE_HODL:
+        purchasing_currency = market.split('/')[1]
+        purchasing_funds = balance[purchasing_currency] * BUY_FRACTION
+        trade_amount = purchasing_funds * ticker['ask']
+        logger.info('buying %s with %s at %s with %s gives %s total', market.split(
+            '/')[0], purchasing_currency, ticker['ask'], purchasing_funds, trade_amount)
+    elif side == SIDE_SELL:
+        sell_currency = market.split('/')[0]
+        trade_amount = balance[sell_currency] * SELL_FRACTION
+        logger.info('selling %s for %s gives %s total',
+                    sell_currency, market.split('/')[0], trade_amount)
+    trade_amount = math.floor(trade_amount / limits.price_filter.tick_size) * \
+        limits.price_filter.tick_size
+    logger.info('funds available results in %s sale', trade_amount)
+    if trade_amount < limits.lot_size.min_qty:
         return None
-    elif side not in (SIDE_BUY, SIDE_SELL):
-        raise Exception('Unknown side for execution')
-    if side == SIDE_BUY:
-        return exchange.create_limit_buy_order(market, trading_amount, price)
-    else:
-        return exchange.create_limit_sell_order(market, trading_amount, price)
+    return trade_amount

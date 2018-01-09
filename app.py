@@ -7,30 +7,38 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.info("Initiated")
 
-MAKE_TRADES_EVENT = 'MAKE_TRADES'
+MACD_TRADES_EVENT = 'MACD_TRADES'
 
 
-class MakeTradesEvent:
-    def __init__(self, exchange):
+class MacdTradesEvent:
+    def __init__(self, exchange, market, timeframe='30m', ma1=12, ma2=26):
         self.exchange = exchange
+        self.market = market
+        self.timeframe = timeframe
+        self.ma1 = ma1
+        self.ma2 = ma2
 
 
 def event_handler(event, context):
     logger.info('event received: %s', str(event))
-    if event['type'] == MAKE_TRADES_EVENT:
-        return make_trades_handler(event)
-
-
-def make_trades_handler(event):
-    logger.info('make trades event received: %s', str(event))
-
-    event = MakeTradesEvent(event['exchange'])
-    exchange = mkt.get_exchange(event.exchange)
+    exchange = mkt.get_exchange(event['exchange'])
     logger.info('exchange configured')
-    return macd.find_and_act_on_markets(exchange, logger)
+    market = event['market']
+    event_type = event['type']
+    del event['exchange']
+    del event['market']
+    del event['type']
+    if event_type == MACD_TRADES_EVENT:
+        logger.info('macd trades event received: %s', str(event))
+        return macd_trades_handler(exchange, market, event)
+
+
+def macd_trades_handler(exchange, market, event_params):
+    market_order = mkt.predict_market_trade(
+        macd.predict_behavior, logger, exchange, market, **event_params)
+    return market_order.place_trade(exchange)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    make_trades_handler({'exchange': sys.argv[1]})
-
+    event_handler({'type': sys.argv[1], 'exchange': sys.argv[2], 'market': sys.argv[3]}, None)
