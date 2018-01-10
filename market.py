@@ -92,12 +92,16 @@ class Limit_Order:
 
 
 def fetch_limits(exchange, market):
+    mkt_filters = exchange.market(market)['info']['filters']
     mkt_limits = exchange.market(market)['limits']
     return Market_Limit(
         min_price=mkt_limits['price']['min'],
         max_price=mkt_limits['price']['max'],
         min_qty=mkt_limits['amount']['min'],
-        max_qty=mkt_limits['amount']['max']
+        max_qty=mkt_limits['amount']['max'],
+        min_notional=float([mkt_filter['minNotional'] for mkt_filter in mkt_filters if mkt_filter['filterType'] == 'MIN_NOTIONAL'][0]),
+        tick_size=float([mkt_filter['tickSize'] for mkt_filter in mkt_filters if mkt_filter['filterType'] == 'PRICE_FILTER'][0]),
+        step_size=float([mkt_filter['stepSize'] for mkt_filter in mkt_filters if mkt_filter['filterType'] == 'LOT_SIZE'][0])
     )
 
 
@@ -187,8 +191,12 @@ def get_limit_bounds_trading_amount(limits, market, upper_bound, lower_bound, ba
     unrounded_buy_amount = buy_funds / ticker['ask']
     sell_amount = get_rounded_trading_amount(
         unrounded_sell_amount, limits.lot_size.step_size, limits.lot_size.min_qty)
+    if sell_amount * upper_bound < limits.min_notional:
+        sell_amount = None
     buy_amount = get_rounded_trading_amount(
         unrounded_buy_amount, limits.lot_size.step_size, limits.lot_size.min_qty)
+    if buy_amount * lower_bound < limits.min_notional:
+        buy_amount = None
     return sell_amount, buy_amount
 
 
