@@ -184,7 +184,7 @@ def get_limit_bounds_trading_amount(limits, market, upper_bound, lower_bound, ba
     sell_funds = balance[sell_currency] * LIMIT_BOUND_TRADE_FRACTION
     buy_funds = balance[buy_currency] * LIMIT_BOUND_TRADE_FRACTION
     unrounded_sell_amount = sell_funds
-    unrounded_buy_amount = buy_funds * ticker['ask']
+    unrounded_buy_amount = buy_funds / ticker['ask']
     sell_amount = get_rounded_trading_amount(
         unrounded_sell_amount, limits.lot_size.step_size, limits.lot_size.min_qty)
     buy_amount = get_rounded_trading_amount(
