@@ -1,5 +1,15 @@
 # moneybot
 
+## installation
+
+It is suggested that you use [`virtualenvwrapper`](https://virtualenv.pypa.io) to install requirements
+
+```sh
+$ workon
+$ mkvirtualenv moneybot
+$ pip install -r requirements.txt
+```
+
 
 ## setup
 
@@ -9,4 +19,4 @@
 
 ## execution
 
-`$ python app.py <Exchange>`
+`$ python app/app.py <TRADE_TYPE> <EXCHANGE> <MARKET>`
