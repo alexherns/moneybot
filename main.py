@@ -2,11 +2,11 @@ import logging
 import sys
 
 # algorithms
-import macd
-import bollinger
+from app import macd
+from app import bollinger
 
 # market
-import market as mkt
+from app import market as mkt
 
 
 # configure logging
