@@ -1,5 +1,8 @@
 *.pyc
 *.ipynb
 *.zip
+*.tfvars
+.terraform
+terraform.tfstate*
 sandbox
 dist

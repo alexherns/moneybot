@@ -13,3 +13,13 @@ build:
 
 install:
 	pip install -r requirements.txt
+
+pre-deploy:
+	terraform init
+
+deploy:
+	terraform apply
+
+destroy:
+	terraform destroy
+

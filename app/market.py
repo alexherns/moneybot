@@ -106,8 +106,11 @@ def fetch_limits(exchange, market):
 
 
 def get_exchange(exchange):
-    api_key = os.environ[exchange.upper() + _api_key_addresss]
-    api_secret = os.environ[exchange.upper() + _api_secret_address]
+    api_key = os.environ[_api_key_addresss]
+    api_secret = os.environ[_api_secret_address]
+    # NOTE: disabling multi-exchange credentials temporarily to ease build
+    # api_key = os.environ[exchange.upper() + _api_key_addresss]
+    # api_secret = os.environ[exchange.upper() + _api_secret_address]
     exc = getattr(ccxt, exchange.lower())({
         'apiKey': api_key,
         'secret': api_secret,
