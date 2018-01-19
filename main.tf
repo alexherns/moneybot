@@ -9,4 +9,5 @@ module "lambda" {
   frequency             = "${var.frequency}"
   api_key               = "${var.api_key}"
   api_secret            = "${var.api_secret}"
+  function_name         = "${var.function_name}"
 }

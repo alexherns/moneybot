@@ -7,6 +7,7 @@ variable "exchange" {}
 variable "api_key" {}
 variable "api_secret" {}
 variable "frequency" {}
+variable "function_name" {}
 
 provider "aws" {
   region                  = "${var.app_region}"
@@ -68,8 +69,8 @@ resource "aws_lambda_function" "main" {
 
   environment {
     variables = {
-      "_API_KEY"    = "${var.api_key}"
-      "_API_SECRET" = "${var.api_secret}"
+      "EXCHANGE_API_KEY"    = "${var.api_key}"
+      "EXCHANGE_API_SECRET" = "${var.api_secret}"
     }
   }
 }

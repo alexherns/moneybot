@@ -38,10 +38,10 @@ Next, run terraform initialization:
 
 In order to deploy into your aws infrastructure, you'll need to have the aws command line tools installed and initial setup run.
 Once you've properly set up `aws` you'll need to configure terraform for your environment and algorithm.
-You can either edit the existing `main.variables.tf` or create a custom `.tfvars` file in this directory which
-will override the defaults set in `main.variables.tf`. 
+You can either edit the existing `main.variables.tf` or create a custom `.auto.tfvars` file in this directory which
+will automatically override the defaults set in `main.variables.tf`. 
 
-Example `my_moneybot_algo.tfvars`:
+Example `my_moneybot_algo.auto.tfvars`:
 
 ```
 "auth_profile" = "<your_aws_profile>"
