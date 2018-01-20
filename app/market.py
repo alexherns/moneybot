@@ -1,5 +1,6 @@
 import os
 import math
+import boto3
 import ccxt
 import common
 
@@ -105,12 +106,29 @@ def fetch_limits(exchange, market):
     )
 
 
-def get_exchange(exchange):
-    api_key = os.environ['EXCHANGE' + _api_key_addresss]
-    api_secret = os.environ['EXCHANGE' + _api_secret_address]
+def get_secrets():
     # NOTE: disabling multi-exchange credentials temporarily to ease build
-    # api_key = os.environ[exchange.upper() + _api_key_addresss]
-    # api_secret = os.environ[exchange.upper() + _api_secret_address]
+    # try locally
+    try:
+        api_key = os.environ['EXCHANGE' + _api_key_addresss]
+        api_secret = os.environ['EXCHANGE' + _api_secret_address]
+        return api_key, api_secret
+    except:
+        pass
+    # try via SSM
+    ssm = boto3.client('ssm')
+    key_param = ssm.get_parameter(Name='EXCHANGE' + _api_key_addresss, WithDecryption=True)
+    api_key = key_param['Parameter']['Value']
+    secret_param = ssm.get_parameter(Name='EXCHANGE' + _api_secret_address, WithDecryption=True)
+    api_secret = secret_param['Parameter']['Value']
+    return api_key, api_secret
+    # except:
+    #     pass
+    # raise Exception('No secrets found')
+
+
+def get_exchange(exchange):
+    api_key, api_secret = get_secrets()
     exc = getattr(ccxt, exchange.lower())({
         'apiKey': api_key,
         'secret': api_secret,

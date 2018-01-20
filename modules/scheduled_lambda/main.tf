@@ -15,6 +15,8 @@ provider "aws" {
   profile                 = "${var.auth_profile}"
 }
 
+data "aws_caller_identity" "current" {}
+
 resource "aws_iam_role" "main" {
   name = "${var.function_name}-lambda-role"
 
@@ -50,6 +52,20 @@ resource "aws_iam_role_policy" "main" {
                 "logs:PutLogEvents"
             ],
             "Resource": "arn:aws:logs:*:*:*"
+        },
+        {
+            "Effect":"Allow",
+            "Action":[
+                "ssm:GetParameters"
+            ],
+            "Resource": "arn:aws:ssm:${var.app_region}:${data.aws_caller_identity.current.account_id}:parameter/EXCHANGE_API_*"
+        },
+        {
+            "Effect":"Allow",
+            "Action":[
+                "kms:Decrypt"
+            ],
+            "Resource": "arn:aws:kms:${var.app_region}:${data.aws_caller_identity.current.account_id}:key/*"
         }
     ]
 }
@@ -67,12 +83,12 @@ resource "aws_lambda_function" "main" {
   timeout          = "${var.function_timeout}"
   source_code_hash = "${base64sha256(file("${var.payload_path}"))}"
 
-  environment {
-    variables = {
-      "EXCHANGE_API_KEY"    = "${var.api_key}"
-      "EXCHANGE_API_SECRET" = "${var.api_secret}"
-    }
-  }
+  # environment {
+  #   variables = {
+  #     "EXCHANGE_API_KEY"    = "${var.api_key}"
+  #     "EXCHANGE_API_SECRET" = "${var.api_secret}"
+  #   }
+  # }
 }
 
 resource "aws_cloudwatch_event_rule" "main" {
@@ -99,4 +115,16 @@ resource "aws_lambda_permission" "main" {
   function_name = "${aws_lambda_function.main.function_name}"
   principal     = "events.amazonaws.com"
   source_arn    = "${aws_cloudwatch_event_rule.main.arn}"
+}
+
+resource "aws_ssm_parameter" "api_key" {
+  name  = "EXCHANGE_API_KEY"
+  type  = "SecureString"
+  value = "${var.api_key}"
+}
+
+resource "aws_ssm_parameter" "api_secret" {
+  name  = "EXCHANGE_API_SECRET"
+  type  = "SecureString"
+  value = "${var.api_secret}"
 }
