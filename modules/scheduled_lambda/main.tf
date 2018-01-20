@@ -1,13 +1,11 @@
 variable "app_region" {}
 variable "auth_profile" {}
 variable "auth_credentials_file" {}
-variable "trade_type" {}
-variable "market" {}
-variable "exchange" {}
 variable "api_key" {}
 variable "api_secret" {}
 variable "frequency" {}
 variable "function_name" {}
+variable "event_json" {}
 
 provider "aws" {
   region                  = "${var.app_region}"
@@ -56,9 +54,9 @@ resource "aws_iam_role_policy" "main" {
         {
             "Effect":"Allow",
             "Action":[
-                "ssm:GetParameters"
+                "ssm:*"
             ],
-            "Resource": "arn:aws:ssm:${var.app_region}:${data.aws_caller_identity.current.account_id}:parameter/EXCHANGE_API_*"
+            "Resource": "arn:aws:ssm:${var.app_region}:${data.aws_caller_identity.current.account_id}:parameter/*"
         },
         {
             "Effect":"Allow",
@@ -82,13 +80,6 @@ resource "aws_lambda_function" "main" {
   runtime          = "python2.7"
   timeout          = "${var.function_timeout}"
   source_code_hash = "${base64sha256(file("${var.payload_path}"))}"
-
-  # environment {
-  #   variables = {
-  #     "EXCHANGE_API_KEY"    = "${var.api_key}"
-  #     "EXCHANGE_API_SECRET" = "${var.api_secret}"
-  #   }
-  # }
 }
 
 resource "aws_cloudwatch_event_rule" "main" {
@@ -100,13 +91,7 @@ resource "aws_cloudwatch_event_target" "main" {
   rule = "${aws_cloudwatch_event_rule.main.name}"
   arn  = "${aws_lambda_function.main.arn}"
 
-  input = <<EOF
-{
-  "type": "${var.trade_type}",
-  "exchange": "${var.exchange}",
-  "market": "${var.market}"
-}
-EOF
+  input = "${var.event_json}"
 }
 
 resource "aws_lambda_permission" "main" {

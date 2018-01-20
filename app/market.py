@@ -100,9 +100,12 @@ def fetch_limits(exchange, market):
         max_price=mkt_limits['price']['max'],
         min_qty=mkt_limits['amount']['min'],
         max_qty=mkt_limits['amount']['max'],
-        min_notional=float([mkt_filter['minNotional'] for mkt_filter in mkt_filters if mkt_filter['filterType'] == 'MIN_NOTIONAL'][0]),
-        tick_size=float([mkt_filter['tickSize'] for mkt_filter in mkt_filters if mkt_filter['filterType'] == 'PRICE_FILTER'][0]),
-        step_size=float([mkt_filter['stepSize'] for mkt_filter in mkt_filters if mkt_filter['filterType'] == 'LOT_SIZE'][0])
+        min_notional=float([mkt_filter['minNotional']
+                            for mkt_filter in mkt_filters if mkt_filter['filterType'] == 'MIN_NOTIONAL'][0]),
+        tick_size=float([mkt_filter['tickSize']
+                         for mkt_filter in mkt_filters if mkt_filter['filterType'] == 'PRICE_FILTER'][0]),
+        step_size=float([mkt_filter['stepSize']
+                         for mkt_filter in mkt_filters if mkt_filter['filterType'] == 'LOT_SIZE'][0])
     )
 
 
@@ -117,9 +120,11 @@ def get_secrets():
         pass
     # try via SSM
     ssm = boto3.client('ssm')
-    key_param = ssm.get_parameter(Name='EXCHANGE' + _api_key_addresss, WithDecryption=True)
+    key_param = ssm.get_parameter(
+        Name='EXCHANGE' + _api_key_addresss, WithDecryption=True)
     api_key = key_param['Parameter']['Value']
-    secret_param = ssm.get_parameter(Name='EXCHANGE' + _api_secret_address, WithDecryption=True)
+    secret_param = ssm.get_parameter(
+        Name='EXCHANGE' + _api_secret_address, WithDecryption=True)
     api_secret = secret_param['Parameter']['Value']
     return api_key, api_secret
     # except:
@@ -177,6 +182,11 @@ def get_market_trading_amount(logger, limits, market, side, balance, ticker):
 
 def predict_limit_bounds_trade(limit_bounds_trade_algorithm, logger, exchange, market, **kwargs):
     logger.info('evaluating market %s for limit bounds trade', market)
+    try:
+        trade_fraction = kwargs['trade_fraction']
+        del kwargs['trade_fraction']
+    except:
+        trade_fraction = LIMIT_BOUND_TRADE_FRACTION
     upper_bound, lower_bound = limit_bounds_trade_algorithm(
         exchange, market, **kwargs)
     logger.info('upper bound: %s, lower bound: %s', upper_bound, lower_bound)
@@ -187,7 +197,7 @@ def predict_limit_bounds_trade(limit_bounds_trade_algorithm, logger, exchange, m
     limits = fetch_limits(exchange, market)
     balance = exchange.fetch_free_balance()
     sell_amount, buy_amount = get_limit_bounds_trading_amount(
-        limits, market, upper_bound, lower_bound, balance, ticker)
+        limits, market, upper_bound, lower_bound, balance, ticker, trade_fraction)
     logger.info('upper amount: %s, lower amount: %s', sell_amount, buy_amount)
     return (
         Limit_Trade(market, common.SIDE_SELL, sell_amount,
@@ -204,19 +214,19 @@ def get_rounded_trading_amount(unrounded_amount, step_size, min_qty):
     return rounded_amount
 
 
-def get_limit_bounds_trading_amount(limits, market, upper_bound, lower_bound, balance, ticker):
+def get_limit_bounds_trading_amount(limits, market, upper_bound, lower_bound, balance, ticker, trade_fraction):
     sell_currency, buy_currency = market.split('/')
-    sell_funds = balance[sell_currency] * LIMIT_BOUND_TRADE_FRACTION
-    buy_funds = balance[buy_currency] * LIMIT_BOUND_TRADE_FRACTION
+    sell_funds = balance[sell_currency] * trade_fraction
+    buy_funds = balance[buy_currency] * trade_fraction
     unrounded_sell_amount = sell_funds
     unrounded_buy_amount = buy_funds / ticker['ask']
     sell_amount = get_rounded_trading_amount(
         unrounded_sell_amount, limits.lot_size.step_size, limits.lot_size.min_qty)
-    if sell_amount * upper_bound < limits.min_notional:
+    if not sell_amount or sell_amount * upper_bound < limits.min_notional:
         sell_amount = None
     buy_amount = get_rounded_trading_amount(
         unrounded_buy_amount, limits.lot_size.step_size, limits.lot_size.min_qty)
-    if buy_amount * lower_bound < limits.min_notional:
+    if not buy_amount or buy_amount * lower_bound < limits.min_notional:
         buy_amount = None
     return sell_amount, buy_amount
 

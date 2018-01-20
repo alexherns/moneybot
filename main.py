@@ -68,5 +68,8 @@ def bollinger_trades_handler(exchange, market, event_params):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    event_handler(
-        {'type': sys.argv[1], 'exchange': sys.argv[2], 'market': sys.argv[3]}, None)
+    event_handler({
+        'type': sys.argv[1],
+        'exchange': sys.argv[2],
+        'market': sys.argv[3],
+    }, None)

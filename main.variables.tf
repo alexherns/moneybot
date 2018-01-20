@@ -22,20 +22,18 @@ variable "api_key" {}
 
 variable "api_secret" {}
 
-variable "exchange" {
-  default = "BINANCE"
-}
-
 # Algorithm configuration
-
-variable "trade_type" {
-  default = "MACD_TRADES"
-}
-
-variable "market" {
-  default = "ETH/BTC"
-}
 
 variable "frequency" {
   default = 5
+}
+
+variable "event_json" {
+  default = <<EOF
+{
+  "type": "MACD_TRADES",
+  "market": "ETH/BTC",
+  "exchange": "BINANCE"
+}
+EOF
 }
