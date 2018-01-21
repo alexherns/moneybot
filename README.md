@@ -43,14 +43,19 @@ will automatically override the defaults set in `main.variables.tf`.
 
 Example `my_moneybot_algo.auto.tfvars`:
 
-```
-"auth_profile" = "<your_aws_profile>"
-"api_key" = "<your_exchange_api_key>"
-"api_secret" = "<your_exchange_api_secret>"
-"exchange" = "<CRYPTO_EXCHANGE_ALL_CAPS>
-"trade_type" = "<TRADE_TYPE_SEE_MAIN.PY>"
-"market" = "<QUOTE_CURRENCY/BASE_CURRENCY>"
-"frequency" = "<TRADE_FREQUENCY_IN_MINUTES>"
+```hcl
+auth_profile = "<YOUR_AWS_PROFILE>"
+api_key = "<YOUR_EXCHANGE_API_KEY>"
+api_secret = "<YOUR_EXCHANGE_API_SECRET>"
+frequency = "<TRADE_FREQUENCY_IN_MINUTES>"
+# algorithm details go below
+event_json = <<EOF
+{
+    "exchange": "<CRYPTO_EXCHANGE_ALL_CAPS>"
+    "trade_type": "<TRADE_TYPE_SEE_MAIN.PY>",
+    "market": "<QUOTE_CURRENCY/BASE_CURRENCY>"
+}
+EOF
 ```
 
 Coming soon: config-level optimizations so that you can fine-tune parameter settings
